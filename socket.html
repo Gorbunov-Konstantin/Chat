@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Client</title>
+</head>
+<body>
+    <div class="message"></div>
+    <textarea placeholder="To send your message, press Enter"></textarea>
+    <div>
+        <input type="text" id="roomInput" placeholder="Enter room name">
+        <button id="createRoomBtn">Create Room</button>
+        <button id="enterRoomBtn">Enter Room</button>
+        <button id="leaveRoomBtn">Leave Room</button>
+        <button id="listRoomsBtn">List Rooms</button> <!-- Add List Rooms button -->
+    </div>
+    <script>
+        var socket = null;
+        var currentRoom = null;
+        var userName = prompt("Please enter your username:", "Anonymous") || "Anonymous";
+
+        function connectToWebSocket() {
+            if (socket) {
+                socket.close();
+            }
+            socket = new WebSocket("ws://localhost:5678");
+		 
+            socket.onopen = function () {
+                document.querySelector("textarea").addEventListener('keyup', function (e) {
+                    if (e.keyCode === 13) {
+                        if (this.value.trim() === "") {
+                            return false;
+                        }
+                        socket.send(userName + ": " + this.value.trim());
+                        this.value = "";
+                    }
+                });
+
+                document.querySelector("#roomInput").addEventListener('keyup', function (e) {
+                    if (e.keyCode === 13) {
+                        var roomName = this.value.trim();
+                        if (roomName === "") {
+                            return false;
+                        }
+				socket.send("/setUserName " + userName);
+                        socket.send('/enter ' + roomName);
+                        this.value = "";
+                        currentRoom = roomName;
+                    }
+                });
+            };
+
+            socket.onerror = function () {
+                console.log('Error connecting to the server');
+            };
+
+            socket.onmessage = function (e) {
+                var p = document.createElement("p");
+                p.innerHTML = e.data;
+                document.querySelector(".message").appendChild(p);
+            };
+        }
+
+        document.querySelector("#createRoomBtn").addEventListener("click", function () {
+            var roomName = document.querySelector("#roomInput").value;
+            if (roomName.trim() === "") {
+                return;
+            }
+            socket.send("/create " + roomName);
+        });
+
+        document.querySelector("#enterRoomBtn").addEventListener("click", function () {
+    var roomName = document.querySelector("#roomInput").value;
+    if (roomName.trim() === "") {
+        return;
+    }
+    socket.send("/enter " + roomName);
+    currentRoom = roomName;
+
+    // Clear the existing chat messages
+    var messageDiv = document.querySelector(".message");
+    messageDiv.innerHTML = "";
+
+    // Display the saved messages for the entered room
+    socket.send('/listSavedMessages ' + roomName);
+});
+
+        document.querySelector("#leaveRoomBtn").addEventListener("click", function () {
+            var roomName = document.querySelector("#roomInput").value;
+            if (roomName.trim() === "") {
+                return;
+            }
+            socket.send("/leave " + roomName);
+            currentRoom = null;
+        });
+
+        document.querySelector("#listRoomsBtn").addEventListener("click", function () {
+            // Request a list of rooms and users in them from the server
+            socket.send('/listRooms');
+        });
+
+        connectToWebSocket();
+    </script>
+</body>
+</html>
